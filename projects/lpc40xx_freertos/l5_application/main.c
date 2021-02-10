@@ -14,6 +14,27 @@ static void create_uart_task(void);
 static void blink_task(void *params);
 static void uart_task(void *params);
 
+// lab 2
+static void task_one(void *task_parameter) {
+  while (true) {
+    // Read existing main.c regarding when we should use fprintf(stderr...) in place of printf()
+    // For this lab, we will use fprintf(stderr, ...)
+    fprintf(stderr, "AAAAAAAAAAAA");
+
+    // Sleep for 100ms
+    vTaskDelay(100);
+  }
+}
+
+static void task_two(void *task_parameter) {
+  while (true) {
+    fprintf(stderr, "bbbbbbbbbbbb");
+    vTaskDelay(100);
+  }
+}
+
+// flash: python nxp-programmer/flash.py
+
 int main(void) {
   create_blinky_tasks();
   create_uart_task();
@@ -23,7 +44,12 @@ int main(void) {
   // uart3_init();                                                                     // Also include:  uart3_init.h
   // xTaskCreate(esp32_tcp_hello_world_task, "uart3", 1000, NULL, PRIORITY_LOW, NULL); // Include esp32_task.h
 
-  puts("Starting RTOS");
+  puts("Starting RTOS,  why hello there world");
+  // LAB 2
+
+  xTaskCreate(task_one, "aaaaaa", 1000, NULL, PRIORITY_LOW, NULL);
+  xTaskCreate(task_two, "bbbbbb", 1000, NULL, PRIORITY_HIGH, NULL);
+
   vTaskStartScheduler(); // This function never returns unless RTOS scheduler runs out of memory and fails
 
   return 0;

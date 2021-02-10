@@ -1,3 +1,14 @@
 {
-    "python.pythonPath": "C:\\Users\\14087\\AppData\\Local\\Programs\\Python\\Python37-32\\python.exe"
+    "python.pythonPath": "C:\\Users\\14087\\AppData\\Local\\Programs\\Python\\Python37-32\\python.exe",
+    "files.associations": {
+        "*.tcc": "c",
+        "cstdio": "c",
+        "exception": "c",
+        "optional": "c",
+        "random": "c",
+        "mutex": "c",
+        "new": "c",
+        "type_traits": "c",
+        "*.def": "c"
+    }
 }
