@@ -8,6 +8,9 @@
 #include "periodic_scheduler.h"
 #include "sj2_cli.h"
 
+// lab 3:
+#include "gpio_lab.h"
+
 // 'static' to make these functions 'private' to this file
 static void create_blinky_tasks(void);
 static void create_uart_task(void);
@@ -33,6 +36,60 @@ static void task_two(void *task_parameter) {
   }
 }
 
+// lab 3:
+#include "LPC40xx.h"
+
+typedef struct {
+  /* First get gpio0 driver to work only, and if you finish it
+   * you can do the extra credit to also make it work for other Ports
+   */
+  uint8_t port;
+
+  uint8_t pin;
+} port_pin_s;
+
+void led_task(void *task_parameter) {
+  // Type-cast the paramter that was passed from xTaskCreate()
+  const port_pin_s *led = (port_pin_s *)(task_parameter);
+
+  while (true) {
+    gpiO__set_high(led->port, led->pin);
+    printf("%d: HIGH\n", led->port);
+    vTaskDelay(100);
+
+    gpiO__set_low(led->port, led->pin);
+    printf("%d: low\n", led->port);
+    vTaskDelay(100);
+  }
+}
+
+// part 1:
+// void led_task(void *pvParameters) {
+//   // Choose one of the onboard LEDS by looking into schematics and write code for the below
+//   // 0) Set the IOCON MUX function(if required) select pins to 000
+//   // works:
+//   // LPC_GPIO2->DIR |= (1 << 3);
+//   // 1) Set the DIR register bit for the LED port pin
+//   gpiO__set_as_output(2, 3);
+//   while (true) {
+//     // 2) Set PIN register bit to 0 to turn ON LED (led may be active low)
+//     // Works:
+//     // LPC_GPIO2->PIN |= (1 << 3);
+//     // printf("HIGH");
+//     // printf("%p\n", &(LPC_GPIO2->PIN));
+//     gpiO__set_high(2, 3);
+//     vTaskDelay(100);
+
+//     // 3) Set PIN register bit to 1 to turn OFF LED
+//     // Works:
+//     // LPC_GPIO2->PIN &= ~(1 << 3);
+//     // printf("low");
+//     // printf("%p\n", &(LPC_GPIO2->PIN));
+//     gpiO__set_low(2, 3);
+//     vTaskDelay(100);
+//   }
+// }
+
 // flash: python nxp-programmer/flash.py
 
 int main(void) {
@@ -45,10 +102,13 @@ int main(void) {
   // xTaskCreate(esp32_tcp_hello_world_task, "uart3", 1000, NULL, PRIORITY_LOW, NULL); // Include esp32_task.h
 
   puts("Starting RTOS,  why hello there world");
-  // LAB 2
+  // doesnt like 2048 / sizeof(void *)
 
-  xTaskCreate(task_one, "aaaaaa", 1000, NULL, PRIORITY_LOW, NULL);
-  xTaskCreate(task_two, "bbbbbb", 1000, NULL, PRIORITY_HIGH, NULL);
+  static port_pin_s led0 = {2, 3};
+  static port_pin_s led4 = {1, 26};
+
+  xTaskCreate(led_task, "led0", 2048 / sizeof(void *), &led0, PRIORITY_LOW, NULL);
+  xTaskCreate(led_task, "led4", 2048 / sizeof(void *), &led4, PRIORITY_LOW, NULL);
 
   vTaskStartScheduler(); // This function never returns unless RTOS scheduler runs out of memory and fails
 
@@ -68,6 +128,7 @@ static void create_blinky_tasks(void) {
   led1 = board_io__get_led1();
 
   xTaskCreate(blink_task, "led0", configMINIMAL_STACK_SIZE, (void *)&led0, PRIORITY_LOW, NULL);
+  // undo the mark out below
   xTaskCreate(blink_task, "led1", configMINIMAL_STACK_SIZE, (void *)&led1, PRIORITY_LOW, NULL);
 #else
   const bool run_1000hz = true;
