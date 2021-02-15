@@ -99,7 +99,8 @@ void led_task(void *task_parameter) {
   while (true) {
     // Note: There is no vTaskDelay() here, but we use sleep mechanism while waiting for the binary semaphore (signal)
     if (xSemaphoreTake(switch_press_indication, 1000)) {
-      // TODO: Blink the LED
+      // Blinks the LED you set in main 2 times, will usually end up with 4
+      /*
       gpiO__set_high(led->port, led->pin);
       vTaskDelay(200);
       gpiO__set_low(led->port, led->pin);
@@ -108,6 +109,58 @@ void led_task(void *task_parameter) {
       vTaskDelay(200);
       gpiO__set_low(led->port, led->pin);
       vTaskDelay(200);
+      */
+
+      // fancy blink
+      gpiO__set_low(1, 18);
+      vTaskDelay(100);
+      gpiO__set_low(1, 24);
+      vTaskDelay(100);
+      gpiO__set_low(1, 26);
+      vTaskDelay(100);
+      gpiO__set_low(2, 3);
+      vTaskDelay(100);
+      gpiO__set_high(1, 18);
+      vTaskDelay(100);
+      gpiO__set_high(1, 24);
+      vTaskDelay(100);
+      gpiO__set_high(1, 26);
+      vTaskDelay(100);
+      gpiO__set_high(2, 3);
+      vTaskDelay(100);
+      gpiO__set_low(2, 3);
+      vTaskDelay(100);
+      gpiO__set_low(1, 26);
+      vTaskDelay(100);
+      gpiO__set_low(1, 24);
+      vTaskDelay(100);
+      gpiO__set_low(1, 18);
+      vTaskDelay(100);
+      gpiO__set_high(1, 26);
+      gpiO__set_high(1, 24);
+      vTaskDelay(100);
+      gpiO__set_high(2, 3);
+      gpiO__set_high(1, 18);
+      vTaskDelay(100); //
+      gpiO__set_low(1, 26);
+      gpiO__set_low(1, 24);
+      vTaskDelay(100);
+      gpiO__set_low(2, 3);
+      gpiO__set_low(1, 18);
+      vTaskDelay(100);
+      gpiO__set_high(1, 26);
+      gpiO__set_high(1, 24);
+      vTaskDelay(100);
+      gpiO__set_high(2, 3);
+      gpiO__set_high(1, 18);
+      vTaskDelay(100); //
+      gpiO__set_low(1, 26);
+      gpiO__set_low(1, 24);
+      vTaskDelay(100);
+      gpiO__set_low(2, 3);
+      gpiO__set_low(1, 18);
+      vTaskDelay(100);
+
     } else {
       puts("Timeout: No switch press indication for 1000ms");
     }
@@ -133,7 +186,7 @@ void switch_task(void *task_parameter) {
 
 int main(void) {
   switch_press_indication = xSemaphoreCreateBinary();
-  create_blinky_tasks();
+  // create_blinky_tasks(); This has always been there but I just commented out.
   create_uart_task();
 
   // If you have the ESP32 wifi module soldered on the board, you can try uncommenting this code
