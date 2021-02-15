@@ -18,6 +18,7 @@ static void blink_task(void *params);
 static void uart_task(void *params);
 
 // lab 2
+/*
 static void task_one(void *task_parameter) {
   while (true) {
     // Read existing main.c regarding when we should use fprintf(stderr...) in place of printf()
@@ -34,20 +35,21 @@ static void task_two(void *task_parameter) {
     fprintf(stderr, "bbbbbbbbbbbb");
     vTaskDelay(100);
   }
-}
+} */
 
 // lab 3:
 #include "LPC40xx.h"
-
+#include "semphr.h"
+static SemaphoreHandle_t switch_press_indication;
+// lab 3 part 2:
 typedef struct {
-  /* First get gpio0 driver to work only, and if you finish it
-   * you can do the extra credit to also make it work for other Ports
-   */
+  // First get gpio0 driver to work only, and if you finish it
+  // you can do the extra credit to also make it work for other Ports
+  //
   uint8_t port;
-
   uint8_t pin;
 } port_pin_s;
-
+/*
 void led_task(void *task_parameter) {
   // Type-cast the paramter that was passed from xTaskCreate()
   const port_pin_s *led = (port_pin_s *)(task_parameter);
@@ -61,38 +63,76 @@ void led_task(void *task_parameter) {
     printf("%d: low\n", led->port);
     vTaskDelay(100);
   }
+} */
+
+/*
+lab 3, part 1:
+void led_task(void *pvParameters) {
+  // Choose one of the onboard LEDS by looking into schematics and write code for the below
+  // 0) Set the IOCON MUX function(if required) select pins to 000
+  // works:
+  // LPC_GPIO2->DIR |= (1 << 3);
+  // 1) Set the DIR register bit for the LED port pin
+  gpiO__set_as_output(2, 3);
+  while (true) {
+    // 2) Set PIN register bit to 0 to turn ON LED (led may be active low)
+    // Works:
+    // LPC_GPIO2->PIN |= (1 << 3);
+    // printf("HIGH");
+    // printf("%p\n", &(LPC_GPIO2->PIN));
+    gpiO__set_high(2, 3);
+    vTaskDelay(100);
+
+    // 3) Set PIN register bit to 1 to turn OFF LED
+    // Works:
+    // LPC_GPIO2->PIN &= ~(1 << 3);
+    // printf("low");
+    // printf("%p\n", &(LPC_GPIO2->PIN));
+    gpiO__set_low(2, 3);
+    vTaskDelay(100);
+  }
+} */
+
+// lab 3 part 3:
+void led_task(void *task_parameter) {
+  const port_pin_s *led = (port_pin_s *)(task_parameter);
+  while (true) {
+    // Note: There is no vTaskDelay() here, but we use sleep mechanism while waiting for the binary semaphore (signal)
+    if (xSemaphoreTake(switch_press_indication, 1000)) {
+      // TODO: Blink the LED
+      gpiO__set_high(led->port, led->pin);
+      vTaskDelay(200);
+      gpiO__set_low(led->port, led->pin);
+      vTaskDelay(200);
+      gpiO__set_high(led->port, led->pin);
+      vTaskDelay(200);
+      gpiO__set_low(led->port, led->pin);
+      vTaskDelay(200);
+    } else {
+      puts("Timeout: No switch press indication for 1000ms");
+    }
+  }
 }
 
-// part 1:
-// void led_task(void *pvParameters) {
-//   // Choose one of the onboard LEDS by looking into schematics and write code for the below
-//   // 0) Set the IOCON MUX function(if required) select pins to 000
-//   // works:
-//   // LPC_GPIO2->DIR |= (1 << 3);
-//   // 1) Set the DIR register bit for the LED port pin
-//   gpiO__set_as_output(2, 3);
-//   while (true) {
-//     // 2) Set PIN register bit to 0 to turn ON LED (led may be active low)
-//     // Works:
-//     // LPC_GPIO2->PIN |= (1 << 3);
-//     // printf("HIGH");
-//     // printf("%p\n", &(LPC_GPIO2->PIN));
-//     gpiO__set_high(2, 3);
-//     vTaskDelay(100);
+void switch_task(void *task_parameter) {
+  port_pin_s *switch1 = (port_pin_s *)task_parameter;
 
-//     // 3) Set PIN register bit to 1 to turn OFF LED
-//     // Works:
-//     // LPC_GPIO2->PIN &= ~(1 << 3);
-//     // printf("low");
-//     // printf("%p\n", &(LPC_GPIO2->PIN));
-//     gpiO__set_low(2, 3);
-//     vTaskDelay(100);
-//   }
-// }
+  while (true) {
+    // TODO: If switch pressed, set the binary semaphore
+    if (gpiO__get_level(switch1->port, switch1->pin)) {
+      xSemaphoreGive(switch_press_indication);
+    }
+
+    // Task should always sleep otherwise they will use 100% CPU
+    // This task sleep also helps avoid spurious semaphore give during switch debeounce
+    vTaskDelay(100);
+  }
+}
 
 // flash: python nxp-programmer/flash.py
 
 int main(void) {
+  switch_press_indication = xSemaphoreCreateBinary();
   create_blinky_tasks();
   create_uart_task();
 
@@ -102,13 +142,13 @@ int main(void) {
   // xTaskCreate(esp32_tcp_hello_world_task, "uart3", 1000, NULL, PRIORITY_LOW, NULL); // Include esp32_task.h
 
   puts("Starting RTOS,  why hello there world");
-  // doesnt like 2048 / sizeof(void *)
 
-  static port_pin_s led0 = {2, 3};
-  static port_pin_s led4 = {1, 26};
-
+  // lab 3 part 2:
+  static port_pin_s led0 = {1, 18};
+  static port_pin_s switch0 = {1, 19};
+  // static port_pin_s led4 = {1, 24};
   xTaskCreate(led_task, "led0", 2048 / sizeof(void *), &led0, PRIORITY_LOW, NULL);
-  xTaskCreate(led_task, "led4", 2048 / sizeof(void *), &led4, PRIORITY_LOW, NULL);
+  xTaskCreate(switch_task, "switch0", 2048 / sizeof(void *), &switch0, PRIORITY_LOW, NULL);
 
   vTaskStartScheduler(); // This function never returns unless RTOS scheduler runs out of memory and fails
 
