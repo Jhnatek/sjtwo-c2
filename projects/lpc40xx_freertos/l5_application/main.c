@@ -41,6 +41,7 @@ static void task_two(void *task_parameter) {
 #include "LPC40xx.h"
 #include "semphr.h"
 static SemaphoreHandle_t switch_press_indication;
+static SemaphoreHandle_t switch_press_secret;
 // lab 3 part 2:
 typedef struct {
   // First get gpio0 driver to work only, and if you finish it
@@ -112,6 +113,7 @@ void led_task(void *task_parameter) {
       */
 
       // fancy blink
+      xSemaphoreGive(switch_press_secret);
       gpiO__set_low(1, 18);
       vTaskDelay(100);
       gpiO__set_low(1, 24);
@@ -159,10 +161,39 @@ void led_task(void *task_parameter) {
       vTaskDelay(100);
       gpiO__set_low(2, 3);
       gpiO__set_low(1, 18);
+      vTaskDelay(100);
+      gpiO__set_high(1, 26);
+      gpiO__set_high(1, 24);
+      vTaskDelay(100);
+      gpiO__set_high(2, 3);
+      gpiO__set_high(1, 18);
       vTaskDelay(100);
 
     } else {
       puts("Timeout: No switch press indication for 1000ms");
+    }
+  }
+}
+
+// attempt at secret button
+void secret_button(void *task_parameter) {
+  const port_pin_s *secret = (port_pin_s *)(task_parameter);
+  while (true) {
+    if (xSemaphoreTake(switch_press_secret, 3000)) {
+      if (gpiO__get_level(secret->port, secret->pin)) {
+        for (int i = 0; i < 10; i++) {
+          gpiO__set_low(1, 18);
+          gpiO__set_low(1, 24);
+          gpiO__set_low(1, 26);
+          gpiO__set_low(2, 3);
+          vTaskDelay(100);
+          gpiO__set_high(1, 18);
+          gpiO__set_high(1, 24);
+          gpiO__set_high(1, 26);
+          gpiO__set_high(2, 3);
+          vTaskDelay(100);
+        }
+      }
     }
   }
 }
@@ -186,6 +217,7 @@ void switch_task(void *task_parameter) {
 
 int main(void) {
   switch_press_indication = xSemaphoreCreateBinary();
+  switch_press_secret = xSemaphoreCreateBinary();
   // create_blinky_tasks(); This has always been there but I just commented out.
   create_uart_task();
 
@@ -199,9 +231,11 @@ int main(void) {
   // lab 3 part 2:
   static port_pin_s led0 = {1, 18};
   static port_pin_s switch0 = {1, 19};
+  static port_pin_s secret_switch = {0, 30};
   // static port_pin_s led4 = {1, 24};
   xTaskCreate(led_task, "led0", 2048 / sizeof(void *), &led0, PRIORITY_LOW, NULL);
   xTaskCreate(switch_task, "switch0", 2048 / sizeof(void *), &switch0, PRIORITY_LOW, NULL);
+  xTaskCreate(secret_button, "secret", 2048 / sizeof(void *), &secret_switch, PRIORITY_LOW, NULL);
 
   vTaskStartScheduler(); // This function never returns unless RTOS scheduler runs out of memory and fails
 
