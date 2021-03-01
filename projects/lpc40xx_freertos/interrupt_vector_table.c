@@ -12,7 +12,7 @@
  * To get value, reference &_estack.
  */
 extern void *_estack;
-
+void gpio_interrupt(void);
 /**
  * @{
  * These functions are from entry_point.c and lpc_peripherals.c but they are not

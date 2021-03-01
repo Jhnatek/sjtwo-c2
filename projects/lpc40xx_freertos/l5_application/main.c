@@ -33,26 +33,83 @@ static void task_two(void *task_parameter) {
   }
 }
 
+#include "gpio_isr.h"
+#include "lpc40xx.h"
+#include "lpc_peripherals.h"
+#include "semphr.h"
+
+static SemaphoreHandle_t switch_pressed_signal;
+
+// lab 4 (lab 3 in different branch) make sure to use semaphore as flag/signal in lab
+// for lab he said use 54 for gpio interrupt (interrupt_vector_table.c)
+// use data sheet 8.5 to choose interrupt rising edge for ports
+typedef void (*void_pointer_t)(void);
+// void_pointer_t function_callbacks[3];
+
+// void register_callback(uint8_t index, void_pointer_t function) { function_callbacks[index] = function; }
+
+// void make_callback(uint8_t index) { function_callbacks[index](); }
+
+// lab 4 part 1
+/*void gpio_interrupt(void) {
+  fprintf(stderr, "ISR Entry");
+  xSemaphoreGiveFromISR(switch_pressed_signal, NULL);
+  clear_gpio_interrupt();
+} */
+void clear_gpio_interrupt(void) {
+  // LPC_GPIOINT->IO0IntClr |= (1 << 29);
+  gpiO__interrupt_dispatcher();
+  xSemaphoreGiveFromISR(switch_pressed_signal, NULL);
+  fprintf(stderr, "----clear interrupt---- \n");
+}
+
+void configure_your_gpio_interrupt(void) {
+  LPC_GPIO0->DIR &= ~(1 << 29);
+  LPC_GPIOINT->IO0IntEnR = (1 << 29);
+}
+
+void sleep_on_sem_task(void *pvParameters) {
+  LPC_IOCON->P1_26 = ~(0b111);
+  LPC_GPIO1->DIR |= (1 << 26);
+  while (1) {
+    // Wait forever until a the semaphore is sent/given
+    if (xSemaphoreTake(switch_pressed_signal, portMAX_DELAY)) {
+      printf("     Semaphore taken\n-----------------------\n");
+      // blink led
+      LPC_GPIO1->PIN |= (1 << 26);
+      vTaskDelay(500);
+      LPC_GPIO1->PIN &= ~(1 << 26);
+      vTaskDelay(500);
+      LPC_GPIO1->PIN |= (1 << 26);
+      vTaskDelay(500);
+      LPC_GPIO1->PIN &= ~(1 << 26);
+      vTaskDelay(500);
+    }
+  }
+}
+void switch2(void) { fprintf(stderr, "-----------------------\n  switch 2 was pressed\n"); }
+void switch3(void) { fprintf(stderr, "-----------------------\n  switch 3 was pressed\n"); }
+
 // flash: python nxp-programmer/flash.py
 
 int main(void) {
-  create_blinky_tasks();
-  create_uart_task();
+  // create_blinky_tasks();
+  // create_uart_task();
 
   // If you have the ESP32 wifi module soldered on the board, you can try uncommenting this code
   // See esp32/README.md for more details
   // uart3_init();                                                                     // Also include:  uart3_init.h
   // xTaskCreate(esp32_tcp_hello_world_task, "uart3", 1000, NULL, PRIORITY_LOW, NULL); // Include esp32_task.h
+  puts("Starting RTOS,  why hello there world\n");
 
-  puts("Starting RTOS,  why hello there world");
-  // LAB 2
-
-  xTaskCreate(task_one, "aaaaaa", 1000, NULL, PRIORITY_LOW, NULL);
-  xTaskCreate(task_two, "bbbbbb", 1000, NULL, PRIORITY_HIGH, NULL);
-
+  switch_pressed_signal = xSemaphoreCreateBinary();
+  void_pointer_t switch_pins[] = {switch2, switch3};
+  gpiO__attach_interrupt(0, 30, GPIO_INTR__RISING_EDGE, switch_pins[0]);
+  gpiO__attach_interrupt(0, 29, GPIO_INTR__FALLING_EDGE, switch_pins[1]);
+  NVIC_EnableIRQ(GPIO_IRQn);
+  lpc_peripheral__enable_interrupt(LPC_PERIPHERAL__GPIO, clear_gpio_interrupt, NULL);
+  xTaskCreate(sleep_on_sem_task, "sem", (2048) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
   vTaskStartScheduler(); // This function never returns unless RTOS scheduler runs out of memory and fails
-
-  return 0;
 }
 
 static void create_blinky_tasks(void) {
