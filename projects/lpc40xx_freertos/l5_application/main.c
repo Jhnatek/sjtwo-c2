@@ -9,30 +9,8 @@
 #include "sj2_cli.h"
 
 // 'static' to make these functions 'private' to this file
-static void create_blinky_tasks(void);
-static void create_uart_task(void);
-static void blink_task(void *params);
-static void uart_task(void *params);
 
-// lab 2
-static void task_one(void *task_parameter) {
-  while (true) {
-    // Read existing main.c regarding when we should use fprintf(stderr...) in place of printf()
-    // For this lab, we will use fprintf(stderr, ...)
-    fprintf(stderr, "AAAAAAAAAAAA");
-
-    // Sleep for 100ms
-    vTaskDelay(100);
-  }
-}
-
-static void task_two(void *task_parameter) {
-  while (true) {
-    fprintf(stderr, "bbbbbbbbbbbb");
-    vTaskDelay(100);
-  }
-}
-
+<<<<<<< Updated upstream
 // flash: python nxp-programmer/flash.py
 
 int main(void) {
@@ -75,57 +53,69 @@ static void create_blinky_tasks(void) {
   periodic_scheduler__initialize(stack_size_bytes, !run_1000hz); // Assuming we do not need the high rate 1000Hz task
   UNUSED(blink_task);
 #endif
+=======
+#include "FreeRTOS.h"
+#include "adc.h"
+#include "gpio_isr.h"
+#include "lpc40xx.h"
+#include "lpc_peripherals.h"
+#include "pwm1.h"
+#include "semphr.h"
+#include "task.h"
+
+static QueueHandle_t adc_to_pwm_task_queue;
+
+// flash: python nxp-programmer/flash.py
+
+void pwm_task(void *p) {        // basically PWM is the percent of the cycle that it is on
+  pwm1__init_single_edge(1000); // sets frequency
+
+  // Locate a GPIO pin that a PWM channel will control
+  // NOTE You can use gpio__construct_with_function() API from gpio.h
+  // LPC_IOCON->P2_0 &= ~(1 << 7); // this works because 8:7 are always 0 (This is for me, not for lab)
+  gpio__construct_with_function(2, 0, GPIO__FUNCTION_1);
+
+  // We only need to set PWM configuration once, and the HW will drive
+  // the GPIO at 1000Hz, and control set its duty cycle to 50%
+
+  // Continue to vary the duty cycle in the loop
+  uint8_t percent = 0;
+  int adc_reading = 0;
+  while (1) {
+    if (xQueueReceive(adc_to_pwm_task_queue, &adc_reading, 100)) { // 100 is same as wait 100 for signal
+      percent = ((double)adc_reading / 4096) * 100;                //(adc_voltage / 3.3) = (adc_reading / 4095)
+      pwm1__set_duty_cycle(PWM1__2_0, percent);
+    }
+  }
+>>>>>>> Stashed changes
 }
 
-static void create_uart_task(void) {
-  // It is advised to either run the uart_task, or the SJ2 command-line (CLI), but not both
-  // Change '#if (0)' to '#if (1)' and vice versa to try it out
-#if (0)
-  // printf() takes more stack space, size this tasks' stack higher
-  xTaskCreate(uart_task, "uart", (512U * 8) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
-#else
-  sj2_cli__init();
-  UNUSED(uart_task); // uart_task is un-used in if we are doing cli init()
-#endif
-}
+void adc_task(void *p) { // analog to digital converter
+  adc__initialize();
 
-static void blink_task(void *params) {
-  const gpio_s led = *((gpio_s *)params); // Parameter was input while calling xTaskCreate()
+  // TODO This is the function you need to add to adc.h
+  // You can configure burst mode for just the channel you are using
+  adc__enable_burst_mode();
 
-  // Warning: This task starts with very minimal stack, so do not use printf() API here to avoid stack overflow
-  while (true) {
-    gpio__toggle(led);
-    vTaskDelay(500);
+  // Configure a pin, such as P1.31 with FUNC 011 to route this pin as ADC channel 5
+  // You can use gpio__construct_with_function() API from gpio.h
+  LPC_IOCON->P1_31 &= ~(1 << 7);                          // this sets it in analog mode
+  gpio__construct_with_function(1, 31, GPIO__FUNCTION_3); // ADC[5]
+  int adc_reading = 0; // Note that this 'adc_reading' is not the same variable as the one from adc_task
+  while (1) {
+    // Get the ADC reading using a new routine you created to read an ADC burst reading
+    // TODO: You need to write the implementation of this function
+    // const uint16_t adc_value = adc__get_channel_reading_with_burst_mode(ADC__CHANNEL_5);
+    // fprintf(stderr, "%d\n", adc_value);
+    adc_reading = adc__get_channel_reading_with_burst_mode(ADC__CHANNEL_5); // you need to constantly get reading
+    xQueueSend(adc_to_pwm_task_queue, &adc_reading, 0);
+    vTaskDelay(100);
   }
 }
 
-// This sends periodic messages over printf() which uses system_calls.c to send them to UART0
-static void uart_task(void *params) {
-  TickType_t previous_tick = 0;
-  TickType_t ticks = 0;
-
-  while (true) {
-    // This loop will repeat at precise task delay, even if the logic below takes variable amount of ticks
-    vTaskDelayUntil(&previous_tick, 2000);
-
-    /* Calls to fprintf(stderr, ...) uses polled UART driver, so this entire output will be fully
-     * sent out before this function returns. See system_calls.c for actual implementation.
-     *
-     * Use this style print for:
-     *  - Interrupts because you cannot use printf() inside an ISR
-     *    This is because regular printf() leads down to xQueueSend() that might block
-     *    but you cannot block inside an ISR hence the system might crash
-     *  - During debugging in case system crashes before all output of printf() is sent
-     */
-    ticks = xTaskGetTickCount();
-    fprintf(stderr, "%u: This is a polled version of printf used for debugging ... finished in", (unsigned)ticks);
-    fprintf(stderr, " %lu ticks\n", (xTaskGetTickCount() - ticks));
-
-    /* This deposits data to an outgoing queue and doesn't block the CPU
-     * Data will be sent later, but this function would return earlier
-     */
-    ticks = xTaskGetTickCount();
-    printf("This is a more efficient printf ... finished in");
-    printf(" %lu ticks\n\n", (xTaskGetTickCount() - ticks));
-  }
+void main(void) {
+  adc_to_pwm_task_queue = xQueueCreate(1, sizeof(int));
+  xTaskCreate(pwm_task, "LED", 2048 / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  xTaskCreate(adc_task, "potentiometer", 2048 / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  vTaskStartScheduler();
 }
