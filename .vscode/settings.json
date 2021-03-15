@@ -9,6 +9,18 @@
         "mutex": "c",
         "new": "c",
         "type_traits": "c",
-        "*.def": "c"
+        "*.def": "c",
+        "codecvt": "cpp",
+        "condition_variable": "cpp",
+        "cstddef": "cpp",
+        "forward_list": "cpp",
+        "list": "cpp",
+        "string": "cpp",
+        "rope": "cpp",
+        "future": "cpp",
+        "limits": "cpp",
+        "memory": "cpp",
+        "functional": "cpp",
+        "regex": "cpp"
     }
 }
