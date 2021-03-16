@@ -21,6 +21,8 @@
         "limits": "cpp",
         "memory": "cpp",
         "functional": "cpp",
-        "regex": "cpp"
+        "regex": "cpp",
+        "queue.h": "c",
+        "stdlib.h": "c"
     }
 }
