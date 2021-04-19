@@ -1,3 +1,5 @@
 #include <stdio.h>
-void i2c2__slave_init(uint8_t slave_address_to_respond_to);
-void i2c2__master_init(void);
+
+volatile uint8_t slave_memory[256];
+
+void i2c1__slave_init(uint8_t slave_address_to_respond_to);

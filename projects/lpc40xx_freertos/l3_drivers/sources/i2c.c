@@ -7,10 +7,9 @@
 #include "common_macros.h"
 #include "lpc40xx.h"
 #include "lpc_peripherals.h"
-#include <stdbool.h>
 
 /// Set to non-zero to enable debugging, and then you can use I2C__DEBUG_PRINTF()
-#define I2C__ENABLE_DEBUGGING 0
+#define I2C__ENABLE_DEBUGGING 1
 
 #if I2C__ENABLE_DEBUGGING
 #include <stdio.h>
@@ -41,9 +40,8 @@ typedef struct {
   uint8_t error_code;
   uint8_t slave_address;
   uint8_t starting_slave_memory_address;
-  bool slave_address_received;
   uint8_t slave_register_address;
-
+  uint8_t slave_address_received;
   uint8_t *input_byte_pointer;        ///< Used for reading I2C slave device
   const uint8_t *output_byte_pointer; ///< Used for writing data to the I2C slave device
   size_t number_of_bytes_to_transfer;
@@ -258,6 +256,9 @@ static void i2c__kick_off_transfer(i2c_s *i2c, uint8_t slave_address, uint8_t st
   i2c__set_start_flag(i2c->registers);
 }
 
+bool i2c_slave_callback__read_memory(uint8_t memory_index, uint8_t *memory);
+bool i2c_slave_callback__write_memory(uint8_t memory_index, uint8_t memory_value);
+
 static bool i2c__handle_state_machine(i2c_s *i2c) {
   enum {
     // General states :
@@ -402,13 +403,13 @@ static bool i2c__handle_state_machine(i2c_s *i2c) {
                 Lab 10 Slave cases
     */
   case I2C__STATE_ST_SLAVE_READ_ACK: // = 0xA8,
-    i2c_slave_callback__read_memory(i2c->slave_register_address, &lpc_i2c->DAT);
+    i2c_slave_callback__read_memory(i2c->slave_register_address++, (uint8_t *)&lpc_i2c->DAT);
     i2c__set_ack_flag(lpc_i2c);
     i2c__clear_si_flag_for_hw_to_take_next_action(lpc_i2c);
     break;
 
   case I2C__STATE_ST_SLAVE_READ_NACK: // = 0xB8,
-    i2c_slave_callback__read_memory(i2c->slave_register_address, &lpc_i2c->DAT);
+    i2c_slave_callback__read_memory(i2c->slave_register_address++, (uint8_t *)&lpc_i2c->DAT);
     i2c__set_ack_flag(lpc_i2c);
     i2c__clear_si_flag_for_hw_to_take_next_action(lpc_i2c);
     break;
